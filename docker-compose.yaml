@@ -1,0 +1,54 @@
+version: "3"
+services:
+  es01:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    container_name: es01
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true # along with the memlock settings below, disables swapping
+      - "ES_JAVA_OPTS=-Xms${JVM_XMS} -Xmx${JVM_XMX}" # minimum and maximum Java heap size, recommend setting both to 50% of system RAM
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - 9200:9200
+    volumes:
+      - esdata01:/usr/share/elasticsearch/data
+    networks:
+      - es-net
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${STACK_VERSION}
+    container_name: kibana
+    ports:
+      - 5601:5601
+    expose:
+      - "5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://es01:9200
+    networks:
+      - es-net
+  jupyter:
+    container_name: jupyter
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile-jupyter
+    ports:
+      - "0.0.0.0:8888:8888"
+    privileged: true
+    environment:
+      JUPYTER_ENABLE_LAB: "yes"
+      ELASTICSEARCH_HOSTS: http://es01:9200
+    volumes:
+      - ./.jupyter:/root/.jupyter
+      - ./notebook:/notebook
+      - $HOME/.aws:/root/.aws:ro
+    networks:
+      - es-net
+
+volumes:
+  esdata01:
+    driver: local
+
+networks:
+  es-net:
